@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- đường đi màu cam -->
+    <path android:strokeColor="#F97316" android:strokeWidth="4" android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M30,80 C40,70 34,62 46,60 C58,58 60,72 74,64" />
+    <!-- ghim vị trí -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M54,26 C44.6,26 37,33.6 37,43 C37,55.5 54,72 54,72 C54,72 71,55.5 71,43 C71,33.6 63.4,26 54,26 Z" />
+    <path android:fillColor="#0F766E"
+        android:pathData="M47,43 A7,7 0 1,0 61,43 A7,7 0 1,0 47,43 Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M26,80 A4,4 0 1,0 34,80 A4,4 0 1,0 26,80 Z M70,64 A4,4 0 1,0 78,64 A4,4 0 1,0 70,64 Z" />
+</vector>

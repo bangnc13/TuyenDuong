@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="teal">#0F766E</color>
+    <color name="teal_light">#14B8A6</color>
+
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/teal</item>
+        <item name="android:colorPrimaryDark">@color/teal</item>
+        <item name="android:colorAccent">@color/teal_light</item>
+        <item name="android:statusBarColor">@color/teal</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowBackground">@color/teal</item>
+    </style>
+</resources>

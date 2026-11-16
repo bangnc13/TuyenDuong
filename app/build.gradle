@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'vn.bangnc.tuyenduong'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'vn.bangnc.tuyenduong'
+        minSdk 26
+        targetSdk 34
+        // Mỗi lần GitHub build tự tăng số phiên bản -> cài đè được bản cũ
+        versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
+        versionName "1.0.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('release.jks')
+            storePassword 'bangnc13'
+            keyAlias 'tuyenduong'
+            keyPassword 'bangnc13'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
