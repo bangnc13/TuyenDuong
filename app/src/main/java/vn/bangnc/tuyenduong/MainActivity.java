@@ -104,6 +104,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     private MapGfx.MeOverlay me;
     private RotationGestureOverlay rotOverlay;
     private final List<Overlay> routeOverlays = new ArrayList<>();
+    private final List<Overlay> pinOverlays = new ArrayList<>();
     private OnlineTileSourceBase street, sat;
     private boolean isSat;
     private View panel, menuBtn;
@@ -132,6 +133,9 @@ public class MainActivity extends Activity implements SensorEventListener {
         File base = new File(getCacheDir(), "osm");
         Configuration.getInstance().setOsmdroidBasePath(base);
         Configuration.getInstance().setOsmdroidTileCache(new File(base, "tiles"));
+
+        Router.androidPkg = getPackageName();
+        Router.androidCert = signSha1();
 
         lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         sm = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -172,6 +176,27 @@ public class MainActivity extends Activity implements SensorEventListener {
     public void onBackPressed() {
         if (panelOpen && isPhone()) setPanel(false);
         else super.onBackPressed();
+    }
+
+    /** SHA-1 chữ ký của app (dạng HEX in hoa, không dấu :) để gửi kèm Google API. */
+    @SuppressWarnings("deprecation")
+    private String signSha1() {
+        try {
+            android.content.pm.Signature[] sigs;
+            if (Build.VERSION.SDK_INT >= 28) {
+                android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(),
+                        PackageManager.GET_SIGNING_CERTIFICATES);
+                sigs = pi.signingInfo.getApkContentsSigners();
+            } else {
+                sigs = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNATURES).signatures;
+            }
+            byte[] d = java.security.MessageDigest.getInstance("SHA-1").digest(sigs[0].toByteArray());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(String.format(Locale.US, "%02X", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ================= Giao diện =================
@@ -916,6 +941,7 @@ public class MainActivity extends Activity implements SensorEventListener {
         map.getOverlays().removeAll(routeOverlays);
         routeOverlays.clear();
         List<GeoPoint> all = new ArrayList<>();
+        pinOverlays.clear();
 
         if (route != null) {
             List<GeoPoint> line = new ArrayList<>();
@@ -948,6 +974,8 @@ public class MainActivity extends Activity implements SensorEventListener {
         } else {
             for (Data.Item it : picked()) addMarker(new double[]{it.lat, it.lon}, "", it.name, all);
         }
+        routeOverlays.addAll(pinOverlays); // ghim số luôn nằm trên các nhãn tên
+        pinOverlays.clear();
         // vẽ dưới chấm vị trí của tôi
         int meIdx = map.getOverlays().indexOf(me);
         map.getOverlays().addAll(Math.max(0, meIdx), routeOverlays);
@@ -972,17 +1000,26 @@ public class MainActivity extends Activity implements SensorEventListener {
     private void addMarker(double[] p, String num, final String name, List<GeoPoint> all) {
         GeoPoint g = new GeoPoint(p[0], p[1]);
         all.add(g);
-        Marker m = new Marker(map);
-        m.setPosition(g);
-        MapGfx.Icon ic = MapGfx.pin(getResources(), num, name);
-        m.setIcon(ic.drawable);
-        m.setAnchor(Marker.ANCHOR_CENTER, ic.anchorY);
-        m.setInfoWindow(null);
-        m.setOnMarkerClickListener((mk, mv) -> {
+        Marker.OnMarkerClickListener tap = (mk, mv) -> {
             toast(name);
             return true;
-        });
-        routeOverlays.add(m);
+        };
+        MapGfx.Icon lab = MapGfx.pin(getResources(), num, name, true, false);
+        Marker ml = new Marker(map);
+        ml.setPosition(g);
+        ml.setIcon(lab.drawable);
+        ml.setAnchor(Marker.ANCHOR_CENTER, lab.anchorY);
+        ml.setInfoWindow(null);
+        ml.setOnMarkerClickListener(tap);
+        routeOverlays.add(ml);
+        MapGfx.Icon pin = MapGfx.pin(getResources(), num, name, false, true);
+        Marker mp = new Marker(map);
+        mp.setPosition(g);
+        mp.setIcon(pin.drawable);
+        mp.setAnchor(Marker.ANCHOR_CENTER, pin.anchorY);
+        mp.setInfoWindow(null);
+        mp.setOnMarkerClickListener(tap);
+        pinOverlays.add(mp);
     }
 
     private void toggleLayer() {

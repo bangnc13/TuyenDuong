@@ -23,6 +23,9 @@ final class Router {
         String used;
     }
 
+    /** Gửi kèm để khóa API giới hạn "Android apps" chấp nhận yêu cầu từ app này. */
+    static String androidPkg, androidCert;
+
     private Router() {
     }
 
@@ -49,7 +52,18 @@ final class Router {
             try {
                 JSONObject j = new JSONObject(s);
                 if (j.has("message")) throw new IOException(j.getString("message"));
-                if (j.has("error")) throw new IOException(j.getJSONObject("error").optString("message", s));
+                if (j.has("error")) {
+                    JSONObject e = j.getJSONObject("error");
+                    StringBuilder m = new StringBuilder(e.optString("message", s));
+                    JSONArray det = e.optJSONArray("details");
+                    if (det != null) {
+                        for (int i = 0; i < det.length(); i++) {
+                            String reason = det.getJSONObject(i).optString("reason", "");
+                            if (!reason.isEmpty()) m.append(" [").append(reason).append(']');
+                        }
+                    }
+                    throw new IOException(m.toString());
+                }
             } catch (org.json.JSONException ignore) {
             }
             throw new IOException("HTTP " + code + ": " + s.substring(0, Math.min(200, s.length())));
@@ -132,6 +146,8 @@ final class Router {
         }
         Map<String, String> h = new java.util.HashMap<>();
         h.put("X-Goog-Api-Key", apiKey);
+        if (androidPkg != null) h.put("X-Android-Package", androidPkg);
+        if (androidCert != null) h.put("X-Android-Cert", androidCert);
         h.put("X-Goog-FieldMask", "routes.optimizedIntermediateWaypointIndex,routes.polyline.encodedPolyline,"
                 + "routes.legs.distanceMeters,routes.legs.duration");
         JSONObject r = new JSONObject(http("POST", "https://routes.googleapis.com/directions/v2:computeRoutes",

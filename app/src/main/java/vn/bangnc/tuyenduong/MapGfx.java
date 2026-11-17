@@ -54,6 +54,11 @@ final class MapGfx {
     }
 
     static Icon pin(Resources res, String num, String name) {
+        return pin(res, num, name, true, true);
+    }
+
+    /** Cùng khung hình nên nhãn và ghim tách riêng vẫn khớp vị trí. */
+    static Icon pin(Resources res, String num, String name, boolean drawLabel, boolean drawPin) {
         boolean numbered = num != null && !num.isEmpty();
         Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG);
         tp.setColor(Color.WHITE);
@@ -74,7 +79,7 @@ final class MapGfx {
         Canvas c = new Canvas(b);
         float cx = w / 2f;
 
-        if (!label.isEmpty()) {
+        if (drawLabel && !label.isEmpty()) {
             RectF r = new RectF(cx - lw / 2, sh, cx + lw / 2, sh + lh);
             Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
             bg.setColor(0xE00F2A26);
@@ -89,6 +94,7 @@ final class MapGfx {
         }
 
         float cy = sh + lh + gap + pd / 2;
+        if (!drawPin) return new Icon(new BitmapDrawable(res, b), cy / h);
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         fill.setColor(numbered ? 0xFFEA580C : 0xFFF97316);
         fill.setShadowLayer(dp(2.5f), 0, dp(1), 0x88000000);
