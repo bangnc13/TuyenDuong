@@ -817,10 +817,51 @@ public class MainActivity extends Activity implements SensorEventListener {
         box.addView(k, lp(-1, -2, 6));
         new AlertDialog.Builder(this).setTitle("Cài đặt").setView(box)
                 .setPositiveButton("Lưu", (d, w) -> {
-                    prefs.edit().putString("gkey", k.getText().toString().trim()).apply();
+                    prefs.edit().putString("gkey", cleanKey(k.getText().toString())).apply();
                     toast("Đã lưu");
                 })
+                .setNeutralButton("Lưu + Kiểm tra", (d, w) -> {
+                    prefs.edit().putString("gkey", cleanKey(k.getText().toString())).apply();
+                    testKey();
+                })
                 .setNegativeButton("Hủy", null).show();
+    }
+
+    /** Bỏ mọi ký tự lạ (dấu cách, xuống dòng, ký tự ẩn) khi dán khóa. */
+    private static String cleanKey(String s) {
+        return s == null ? "" : s.replaceAll("[^A-Za-z0-9_\\-]", "");
+    }
+
+    /** Gọi thử Google Routes với 2 điểm cố định và hiện nguyên văn kết quả. */
+    private void testKey() {
+        final String key = cleanKey(prefs.getString("gkey", ""));
+        if (key.isEmpty()) {
+            toast("Chưa nhập khóa");
+            return;
+        }
+        showProgress("Đang kiểm tra khóa…");
+        exec.execute(() -> {
+            String out;
+            try {
+                String body = "{\"origin\":{\"location\":{\"latLng\":{\"latitude\":21.8153,\"longitude\":105.2103}}},"
+                        + "\"destination\":{\"location\":{\"latLng\":{\"latitude\":21.79,\"longitude\":105.22}}},"
+                        + "\"travelMode\":\"TWO_WHEELER\"}";
+                java.util.Map<String, String> h = new java.util.HashMap<>();
+                h.put("X-Goog-Api-Key", key);
+                h.put("X-Goog-FieldMask", "routes.distanceMeters,routes.duration");
+                out = "✅ Khóa dùng được:\n" + Router.http("POST",
+                        "https://routes.googleapis.com/directions/v2:computeRoutes", body, h);
+            } catch (Exception e) {
+                out = "❌ Lỗi:\n" + e.getMessage();
+            }
+            final String o2 = out + "\n\nKhóa: " + key.length() + " ký tự, đuôi …"
+                    + (key.length() > 4 ? key.substring(key.length() - 4) : key);
+            ui.post(() -> {
+                hideProgress();
+                new AlertDialog.Builder(this).setTitle("Kiểm tra Google Routes").setMessage(o2)
+                        .setPositiveButton("OK", null).show();
+            });
+        });
     }
 
     // ================= Tính lộ trình =================
@@ -841,7 +882,7 @@ public class MainActivity extends Activity implements SensorEventListener {
             toast("Hãy chọn thêm đối tượng (hoặc bật định vị).");
             return;
         }
-        final String key = prefs.getString("gkey", "");
+        final String key = cleanKey(prefs.getString("gkey", ""));
         showProgress("Đang tính lộ trình theo đường bộ…");
         exec.execute(() -> {
             Router.Result res = null;
@@ -864,7 +905,12 @@ public class MainActivity extends Activity implements SensorEventListener {
             final String w2 = warn, e2 = err;
             ui.post(() -> {
                 hideProgress();
-                if (w2 != null) toast(w2);
+                if (w2 != null) {
+                    final String k4 = key.length() > 4 ? key.substring(key.length() - 4) : key;
+                    new AlertDialog.Builder(this).setTitle("Google Routes lỗi – đã dùng OSRM")
+                            .setMessage(w2 + "\n\nKhóa đang dùng: …" + k4)
+                            .setPositiveButton("OK", null).show();
+                }
                 if (r2 == null) {
                     new AlertDialog.Builder(this).setTitle("Lỗi").setMessage(e2).setPositiveButton("OK", null).show();
                     return;
