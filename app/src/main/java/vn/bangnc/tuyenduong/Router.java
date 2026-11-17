@@ -55,13 +55,23 @@ final class Router {
                 if (j.has("error")) {
                     JSONObject e = j.getJSONObject("error");
                     StringBuilder m = new StringBuilder(e.optString("message", s));
+                    m.append(" (HTTP ").append(code).append(' ').append(e.optString("status", "")).append(')');
                     JSONArray det = e.optJSONArray("details");
+                    boolean got = false;
                     if (det != null) {
                         for (int i = 0; i < det.length(); i++) {
-                            String reason = det.getJSONObject(i).optString("reason", "");
-                            if (!reason.isEmpty()) m.append(" [").append(reason).append(']');
+                            JSONObject d = det.getJSONObject(i);
+                            String reason = d.optString("reason", "");
+                            if (!reason.isEmpty()) {
+                                m.append(" [").append(reason);
+                                JSONObject md = d.optJSONObject("metadata");
+                                if (md != null && md.has("consumer")) m.append(" · ").append(md.optString("consumer"));
+                                m.append(']');
+                                got = true;
+                            }
                         }
                     }
+                    if (!got) m.append("\n").append(s.substring(0, Math.min(600, s.length())));
                     throw new IOException(m.toString());
                 }
             } catch (org.json.JSONException ignore) {
@@ -146,12 +156,26 @@ final class Router {
         }
         Map<String, String> h = new java.util.HashMap<>();
         h.put("X-Goog-Api-Key", apiKey);
-        if (androidPkg != null) h.put("X-Android-Package", androidPkg);
-        if (androidCert != null) h.put("X-Android-Cert", androidCert);
+
         h.put("X-Goog-FieldMask", "routes.optimizedIntermediateWaypointIndex,routes.polyline.encodedPolyline,"
                 + "routes.legs.distanceMeters,routes.legs.duration");
-        JSONObject r = new JSONObject(http("POST", "https://routes.googleapis.com/directions/v2:computeRoutes",
-                body.toString(), h));
+        String url = "https://routes.googleapis.com/directions/v2:computeRoutes";
+        String raw;
+        try {
+            // Khóa không giới hạn ứng dụng: gửi không kèm thông tin Android
+            raw = http("POST", url, body.toString(), h);
+        } catch (IOException first) {
+            // Khóa giới hạn "Android apps": thử lại kèm tên gói + SHA-1
+            if (androidPkg == null || androidCert == null) throw first;
+            h.put("X-Android-Package", androidPkg);
+            h.put("X-Android-Cert", androidCert);
+            try {
+                raw = http("POST", url, body.toString(), h);
+            } catch (IOException second) {
+                throw first;
+            }
+        }
+        JSONObject r = new JSONObject(raw);
         JSONArray routes = r.optJSONArray("routes");
         if (routes == null || routes.length() == 0) throw new IOException("Google không tìm được tuyến");
         JSONObject rt = routes.getJSONObject(0);
