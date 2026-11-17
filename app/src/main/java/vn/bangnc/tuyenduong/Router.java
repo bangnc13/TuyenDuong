@@ -126,6 +126,93 @@ final class Router {
         return res;
     }
 
+    /**
+     * VIETMAP TSP v4: xe máy, tối ưu thứ tự, xuất phát cố định tại điểm đầu, không quay về.
+     * https://maps.vietmap.vn/docs/map-api/tsp-version/tsp-v4/
+     */
+    static Result vietmap(List<double[]> P, String apiKey) throws Exception {
+        StringBuilder u = new StringBuilder("https://maps.vietmap.vn/api/tsp/v4?apikey=")
+                .append(java.net.URLEncoder.encode(apiKey, "UTF-8"));
+        for (double[] p : P) u.append("&point=").append(p[0]).append(',').append(p[1]);
+        u.append("&vehicle=motorcycle&roundtrip=false&sources=first&destinations=any&points_encoded=true");
+        JSONObject r = new JSONObject(http("GET", u.toString(), null, null));
+        if (!"OK".equalsIgnoreCase(r.optString("code"))) {
+            String msg = r.optString("messages", "");
+            if (msg.isEmpty() || "null".equals(msg)) msg = r.optString("message", "");
+            throw new IOException(r.optString("code", "Lỗi") + (msg.isEmpty() || "null".equals(msg) ? "" : ": " + msg));
+        }
+        JSONArray paths = r.optJSONArray("paths");
+        if (paths == null || paths.length() == 0) throw new IOException("Vietmap không trả về tuyến");
+        JSONObject path = paths.getJSONObject(0);
+        Result res = new Result();
+        res.line = coords(path.opt("points"));
+        List<double[]> snapped = coords(path.opt("snapped_waypoints"));
+        res.order = orderOf(P, snapped.size() == P.size() ? snapped : null, res.line);
+        res.legs = new ArrayList<>();
+        res.legs.add(new double[]{path.optDouble("distance", 0) / 1000, path.optDouble("time", 0) / 60000});
+        res.used = "VIETMAP · xe máy";
+        return res;
+    }
+
+    /** "points" có thể là polyline (chuỗi) hoặc mảng [lon,lat] / GeoJSON. */
+    private static List<double[]> coords(Object o) throws Exception {
+        List<double[]> out = new ArrayList<>();
+        if (o instanceof String) return decode((String) o);
+        JSONArray a = null;
+        if (o instanceof JSONArray) a = (JSONArray) o;
+        else if (o instanceof JSONObject) a = ((JSONObject) o).optJSONArray("coordinates");
+        if (a != null) {
+            for (int i = 0; i < a.length(); i++) {
+                JSONArray xy = a.getJSONArray(i);
+                out.add(new double[]{xy.getDouble(1), xy.getDouble(0)});
+            }
+        }
+        return out;
+    }
+
+    /** Suy ra thứ tự đi: theo các điểm dừng đã bám đường, nếu không có thì theo vị trí trên tuyến. */
+    private static int[] orderOf(List<double[]> P, List<double[]> snapped, List<double[]> line) {
+        int n = P.size();
+        int[] order = new int[n];
+        boolean[] used = new boolean[n];
+        order[0] = 0;
+        used[0] = true;
+        if (snapped != null) {
+            for (int k = 1; k < n; k++) {
+                int best = -1;
+                double bd = Double.MAX_VALUE;
+                for (int i = 1; i < n; i++) {
+                    if (used[i]) continue;
+                    double d = hav(snapped.get(k), P.get(i));
+                    if (d < bd) {
+                        bd = d;
+                        best = i;
+                    }
+                }
+                order[k] = best;
+                used[best] = true;
+            }
+            return order;
+        }
+        // vị trí gần nhất trên tuyến (chỉ số đỉnh), sắp xếp tăng dần
+        final double[] pos = new double[n];
+        for (int i = 1; i < n; i++) {
+            double bd = Double.MAX_VALUE;
+            for (int j = 0; j < line.size(); j++) {
+                double d = hav(line.get(j), P.get(i));
+                if (d < bd) {
+                    bd = d;
+                    pos[i] = j;
+                }
+            }
+        }
+        Integer[] idx = new Integer[n - 1];
+        for (int i = 1; i < n; i++) idx[i - 1] = i;
+        java.util.Arrays.sort(idx, (a, b) -> Double.compare(pos[a], pos[b]));
+        for (int k = 1; k < n; k++) order[k] = idx[k - 1];
+        return order;
+    }
+
     private static JSONObject wp(double[] p) throws Exception {
         return new JSONObject().put("location", new JSONObject().put("latLng",
                 new JSONObject().put("latitude", p[0]).put("longitude", p[1])));

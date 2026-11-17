@@ -809,19 +809,19 @@ public class MainActivity extends Activity implements SensorEventListener {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(20), dp(8), dp(20), 0);
-        box.addView(text("Google Maps API key (Routes API) — để trống sẽ dùng OSRM miễn phí", 13, MUT, false));
+        box.addView(text("Khóa API VIETMAP (maps.vietmap.vn) — tính đường xe máy, tối ưu thứ tự. Để trống sẽ dùng OSRM miễn phí (đường ô tô).", 13, MUT, false));
         final EditText k = new EditText(this);
         k.setSingleLine(true);
-        k.setHint("AIza…");
-        k.setText(prefs.getString("gkey", ""));
+        k.setHint("Dán khóa Vietmap");
+        k.setText(prefs.getString("vkey", ""));
         box.addView(k, lp(-1, -2, 6));
         new AlertDialog.Builder(this).setTitle("Cài đặt").setView(box)
                 .setPositiveButton("Lưu", (d, w) -> {
-                    prefs.edit().putString("gkey", cleanKey(k.getText().toString())).apply();
+                    prefs.edit().putString("vkey", cleanKey(k.getText().toString())).apply();
                     toast("Đã lưu");
                 })
                 .setNeutralButton("Lưu + Kiểm tra", (d, w) -> {
-                    prefs.edit().putString("gkey", cleanKey(k.getText().toString())).apply();
+                    prefs.edit().putString("vkey", cleanKey(k.getText().toString())).apply();
                     testKey();
                 })
                 .setNegativeButton("Hủy", null).show();
@@ -834,7 +834,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
     /** Gọi thử Google Routes với 2 điểm cố định và hiện nguyên văn kết quả. */
     private void testKey() {
-        final String key = cleanKey(prefs.getString("gkey", ""));
+        final String key = cleanKey(prefs.getString("vkey", ""));
         if (key.isEmpty()) {
             toast("Chưa nhập khóa");
             return;
@@ -843,22 +843,20 @@ public class MainActivity extends Activity implements SensorEventListener {
         exec.execute(() -> {
             String out;
             try {
-                String body = "{\"origin\":{\"location\":{\"latLng\":{\"latitude\":21.8153,\"longitude\":105.2103}}},"
-                        + "\"destination\":{\"location\":{\"latLng\":{\"latitude\":21.79,\"longitude\":105.22}}},"
-                        + "\"travelMode\":\"TWO_WHEELER\"}";
-                java.util.Map<String, String> h = new java.util.HashMap<>();
-                h.put("X-Goog-Api-Key", key);
-                h.put("X-Goog-FieldMask", "routes.distanceMeters,routes.duration");
-                out = "✅ Khóa dùng được:\n" + Router.http("POST",
-                        "https://routes.googleapis.com/directions/v2:computeRoutes", body, h);
+                List<double[]> P = new ArrayList<>();
+                P.add(new double[]{21.8153, 105.2103});
+                P.add(new double[]{21.8050, 105.2150});
+                P.add(new double[]{21.7900, 105.2200});
+                Router.Result r = Router.vietmap(P, key);
+                out = String.format(Locale.US, "✅ Khóa dùng được\nThử 3 điểm ở TP Tuyên Quang: %.1f km, %.0f phút (xe máy)",
+                        r.legs.get(0)[0], r.legs.get(0)[1]);
             } catch (Exception e) {
                 out = "❌ Lỗi:\n" + e.getMessage();
             }
-            final String o2 = out + "\n\nKhóa: " + key.length() + " ký tự, đuôi …"
-                    + (key.length() > 4 ? key.substring(key.length() - 4) : key);
+            final String o2 = out;
             ui.post(() -> {
                 hideProgress();
-                new AlertDialog.Builder(this).setTitle("Kiểm tra Google Routes").setMessage(o2)
+                new AlertDialog.Builder(this).setTitle("Kiểm tra VIETMAP").setMessage(o2)
                         .setPositiveButton("OK", null).show();
             });
         });
@@ -882,16 +880,16 @@ public class MainActivity extends Activity implements SensorEventListener {
             toast("Hãy chọn thêm đối tượng (hoặc bật định vị).");
             return;
         }
-        final String key = cleanKey(prefs.getString("gkey", ""));
+        final String key = cleanKey(prefs.getString("vkey", ""));
         showProgress("Đang tính lộ trình theo đường bộ…");
         exec.execute(() -> {
             Router.Result res = null;
             String warn = null, err = null;
-            if (!key.isEmpty() && P.size() <= 27) {
+            if (!key.isEmpty()) {
                 try {
-                    res = Router.google(P, key);
+                    res = Router.vietmap(P, key);
                 } catch (Exception e) {
-                    warn = "Google Routes lỗi, chuyển sang OSRM: " + e.getMessage();
+                    warn = e.getMessage();
                 }
             }
             if (res == null) {
@@ -907,7 +905,7 @@ public class MainActivity extends Activity implements SensorEventListener {
                 hideProgress();
                 if (w2 != null) {
                     final String k4 = key.length() > 4 ? key.substring(key.length() - 4) : key;
-                    new AlertDialog.Builder(this).setTitle("Google Routes lỗi – đã dùng OSRM")
+                    new AlertDialog.Builder(this).setTitle("VIETMAP lỗi – đã dùng OSRM")
                             .setMessage(w2 + "\n\nKhóa đang dùng: …" + k4)
                             .setPositiveButton("OK", null).show();
                 }
